@@ -15,12 +15,11 @@
 				  for the outter four corners are set to 70, meaning that if we predict the player
 				  makes a move at one of the cornor, the value for the node will be added with -70, 
 				  but if it is the ai does the cornor, the value will be added with 70. This
-				  behavior can be observed in line 1010 and line 1015 in the expendNode function.
-				  Based on the observation, with this evaluation function and searching implementation,
-				  the ai will be the most difficult when the depth limit is 2. Any value more than 2
-				  seems to overkill the selection. The evaluated values for many future option can
-				  easily confuse the algorithm, causing the bad move for the current state to be 
-				  selected.
+				  behavior can be observed in the expendNode function. Based on the observation, 
+				  with this evaluation function and searching implementation, the ai will be the 
+				  most difficult when the depth limit is 2. Any value more than 2 seems to overkill 
+				  the selection. The evaluated values for many future option can easily confuse the 
+				  algorithm, causing the bad move for the current state to be selected.
 */
 
 #include <stdio.h>						// standard C libraries
@@ -42,6 +41,8 @@
 #define MAX 5000
 #define WHITE 1
 #define BLACK 2
+#define ANI_MSEC 100
+#define MOVE_INTERVAL 5					// interval between moves in 0.1s
 #define ALPHABETAHEIGHT 2				// Depth for the alpha beta program
 
 
@@ -91,6 +92,8 @@ int blackNum;							// black number on the current board
 int bestMove;							// a variable that uses to capture the best move during search
 int nodeID;								// a variable that uses to count and assign the node id for each node created during search
 int gameState;							// 1: players turn, 2: ais turn, 3: gameover
+int aisturn;
+int aTimer;
 
 int restartButtonX = 538;				// x value of the restart button
 int restartButtonY = 50;				// y value of the restart button
@@ -108,6 +111,7 @@ void mouse_func(int button, int state, int x, int y);
 void init_setup(int width, int height, char *windowName);
 void display_func(void);
 void keyboard_func(unsigned char c, int x, int y);
+void animation_func(int val);
 void reshape_handler(int width, int height);
 
 void reset();												// reset the game
@@ -148,6 +152,7 @@ int main(int argc, char **argv)
 	glutDisplayFunc(display_func);
 	glutKeyboardFunc(keyboard_func);
 	glutMouseFunc(mouse_func);
+	glutTimerFunc(ANI_MSEC, animation_func, 0);
 
 	glutMainLoop();
 
@@ -193,7 +198,6 @@ void display_func(void)
 	glEnd();
 
 	// draw circles
-	int i;
 	for (int i = 0; i < BOARD_SIZE; i++) {
 		for (int j = 0; j < BOARD_SIZE; j++) {
 			if (board[j][i].state != 0) {
@@ -299,49 +303,10 @@ void mouse_func(int button, int state, int x, int y)
 			int flipNum = flip(board, r, c);
 			whiteNum += flipNum + 1;
 			blackNum -= flipNum;
+			stateReset(board);
 
-			glutPostRedisplay();
-			//sleep(1);
-			
-			//displayBoard(board); // for testing
-			int m = aiMove();										// ai's turn
-			if (m == -1) {											// if no move for ai
-				int move = boardScan(board, 0);						// scan the board for ai
-				if (move == 0) gameState = 3;						// if the game is over
-				else if (move == 2) {								// no valid move for ai but the game is not finished
-					setColors(0);									// change to player's perspectivce
-					boardScan(board, 0);							// scan the board for player
-				}
-			}
-			else {													// if there is at least a possible move for ai
-				setColors(1);										// change to ai's perspective
-				boardScan(board, 2);								// scan the board for ai
-
-				// make ai's move and flip
-				flipNum = flip(board, m / BOARD_SIZE, m % BOARD_SIZE);
-				whiteNum -= flipNum;
-				blackNum += flipNum + 1;
-
-				swapColors();										// switch to player's perspective
-				int move = boardScan(board, 0);						// scan the board for ai
-				if (move == 0) gameState = 3;						// if the game is over
-				else if (move == 2) {								// no valid move for ai but the game is not finished
-					int m = aiMove();								// ai's turn
-					setColors(1);									// change to ai's perspective 
-					boardScan(board, 2);							// scan the board for ai
-
-					// make ai's move and flip
-					flipNum = flip(board, m / BOARD_SIZE, m % BOARD_SIZE);
-					whiteNum -= flipNum;
-					blackNum += flipNum + 1;
-
-					swapColors();									// switch to player's perspective	
-					int m2 = boardScan(board, 0);					// scan the board for the player
-					if (m2 == 0) {									// if the game is over 
-						gameState = 3;
-					}
-				}
-			}
+			aTimer = 0;
+			aisturn = 1;
 		}
 
 		glutPostRedisplay();
@@ -356,6 +321,59 @@ void mouse_func(int button, int state, int x, int y)
 		glutPostRedisplay();
 	}
 }
+
+//@@***********************************************************************************@@
+void animation_func(int val) {
+	if (aisturn == 1) {
+		if (aTimer < MOVE_INTERVAL) aTimer++;
+		else {
+			int m = aiMove();										// ai's turn
+			int flipNum;
+			if (m == -1) {											// if no move for ai
+				int move = boardScan(board, 0);						// scan the board for ai
+				if (move == 0) gameState = 3;						// if the game is over
+				else if (move == 2) {								// no valid move for ai but the game is not finished
+					setColors(0);									// change to player's perspectivce
+					boardScan(board, 0);							// scan the board for player
+				}
+			}
+			else {													// if there is at least a possible move for ai
+				setColors(1);										// change to ai's perspective
+				boardScan(board, 2);								// scan the board for ai
+
+																	// make ai's move and flip
+				flipNum = flip(board, m / BOARD_SIZE, m % BOARD_SIZE);
+				whiteNum -= flipNum;
+				blackNum += flipNum + 1;
+
+				swapColors();										// switch to player's perspective
+				int move = boardScan(board, 0);						// scan the board for ai
+				if (move == 0) gameState = 3;						// if the game is over
+				else if (move == 2) {								// no valid move for ai but the game is not finished
+					int m = aiMove();								// ai's turn
+					setColors(1);									// change to ai's perspective 
+					boardScan(board, 2);							// scan the board for ai
+
+																	// make ai's move and flip
+					flipNum = flip(board, m / BOARD_SIZE, m % BOARD_SIZE);
+					whiteNum -= flipNum;
+					blackNum += flipNum + 1;
+
+					swapColors();									// switch to player's perspective	
+					int m2 = boardScan(board, 0);					// scan the board for the player
+					if (m2 == 0 || m2 == 2) {						// if the game is over 
+						gameState = 3;
+					}
+				}
+			}
+			aisturn = 0;
+		}
+	}
+
+	glutPostRedisplay();
+	glutTimerFunc(ANI_MSEC, animation_func, 0);
+}
+
 
 //@@***********************************************************************************@@
 void output(int x, int y, int mode, char *string)
@@ -391,6 +409,7 @@ void reset() {
 	gameState = 1;
 	whiteNum = 2;
 	blackNum = 2;
+	aisturn = 0;
 	setColors(0);
 	for (int i = 0; i < BOARD_SIZE; i++) {
 		for (int j = 0; j < BOARD_SIZE; j++) {
